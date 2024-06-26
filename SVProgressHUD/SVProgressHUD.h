@@ -275,6 +275,10 @@ typedef void (^SVProgressHUDDismissCompletion)(void);
 /// @param image The desired error image.
 + (void)setErrorImage:(nonnull UIImage*)image;
 
+/// Sets the gif image for the HUD.
+/// @param imageData The desired gif image data.
++ (void)setGIFImageData:(nonnull NSData*)imageData;
+
 /// Sets the view for extensions.
 /// @param view The desired view for extensions.
 + (void)setViewForExtension:(nonnull UIView*)view;

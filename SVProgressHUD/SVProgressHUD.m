@@ -13,6 +13,7 @@
 #import "SVIndefiniteAnimatedView.h"
 #import "SVProgressAnimatedView.h"
 #import "SVRadialGradientLayer.h"
+#import "UIImage+animatedGIF.h"
 
 NSString * const SVProgressHUDDidReceiveTouchEventNotification = @"SVProgressHUDDidReceiveTouchEventNotification";
 NSString * const SVProgressHUDDidTouchDownInsideNotification = @"SVProgressHUDDidTouchDownInsideNotification";
@@ -43,6 +44,7 @@ static const CGFloat SVProgressHUDLabelSpacing = 8.0f;
 @property (nonatomic, strong) UIBlurEffect *hudViewCustomBlurEffect;
 @property (nonatomic, strong) UILabel *statusLabel;
 @property (nonatomic, strong) UIImageView *imageView;
+@property (nonatomic, strong) NSData *gifData;
 
 @property (nonatomic, strong) UIView *indefiniteAnimatedView;
 @property (nonatomic, strong) SVProgressAnimatedView *ringView;
@@ -203,6 +205,10 @@ static const CGFloat SVProgressHUDLabelSpacing = 8.0f;
     [self sharedView].errorImage = image;
 }
 
++ (void)setGIFImageData:(NSData*)imageData {
+    [self sharedView].gifData = imageData;
+}
+
 + (void)setViewForExtension:(UIView*)view {
     [self sharedView].viewForExtension = view;
 }
@@ -242,7 +248,11 @@ static const CGFloat SVProgressHUDLabelSpacing = 8.0f;
 #pragma mark - Show Methods
 
 + (void)show {
-    [self showWithStatus:nil];
+    if ([self sharedView].gifData == NULL) {
+        [self showWithStatus:nil];
+    } else {
+        [[self sharedView] showGIFImage:[self sharedView].gifData];
+    }
 }
 
 + (void)showWithStatus:(NSString*)status {
@@ -834,6 +844,41 @@ static const CGFloat SVProgressHUDLabelSpacing = 8.0f;
                 [[NSRunLoop mainRunLoop] addTimer:strongSelf.graceTimer forMode:NSRunLoopCommonModes];
             } else {
                 [strongSelf fadeIn:@(duration)];
+            }
+        }
+    }];
+}
+
+- (void)showGIFImage:(NSData * _Nonnull)imageData {
+  __weak SVProgressHUD *weakSelf = self;
+    [[NSOperationQueue mainQueue] addOperationWithBlock:^{
+        __strong SVProgressHUD *strongSelf = weakSelf;
+        if(strongSelf){
+            // Stop timer
+            strongSelf.fadeOutTimer = nil;
+            strongSelf.graceTimer = nil;
+            
+            // Update / Check view hierarchy to ensure the HUD is visible
+            [strongSelf updateViewHierarchy];
+            
+            // Reset progress and cancel any running animation
+            strongSelf.progress = SVProgressHUDUndefinedProgress;
+            [strongSelf cancelRingLayerAnimation];
+            [strongSelf cancelIndefiniteAnimatedViewAnimation];
+            
+            // Update imageView
+            strongSelf.imageView.image = [UIImage animatedImageWithAnimatedGIFData:imageData];
+            strongSelf.imageView.hidden = NO;
+            
+            // Update text
+            strongSelf.statusLabel.hidden = YES;
+            
+            // Fade in delayed if a grace time is set
+            if (self.graceTimeInterval > 0.0 && self.backgroundView.alpha == 0.0f) {
+                strongSelf.graceTimer = [NSTimer timerWithTimeInterval:self.graceTimeInterval target:strongSelf selector:@selector(fadeIn:) userInfo:nil repeats:NO];
+                [[NSRunLoop mainRunLoop] addTimer:strongSelf.graceTimer forMode:NSRunLoopCommonModes];
+            } else {
+                [strongSelf fadeIn:nil];
             }
         }
     }];
