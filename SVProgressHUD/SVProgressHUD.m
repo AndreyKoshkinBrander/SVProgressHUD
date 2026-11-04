@@ -62,6 +62,7 @@ static const CGFloat SVProgressHUDLabelSpacing = 8.0f;
 
 @implementation SVProgressHUD {
     BOOL _isInitializing;
+    NSUInteger _showGeneration;
 }
 
 + (SVProgressHUD*)sharedView {
@@ -788,6 +789,7 @@ static const CGFloat SVProgressHUDLabelSpacing = 8.0f;
 #pragma mark - Master show/dismiss methods
 
 - (void)showProgress:(float)progress status:(NSString*)status {
+    __sync_add_and_fetch(&_showGeneration, 1);
     __weak SVProgressHUD *weakSelf = self;
     void (^block)(void) = ^{
         __strong SVProgressHUD *strongSelf = weakSelf;
@@ -871,6 +873,7 @@ static const CGFloat SVProgressHUDLabelSpacing = 8.0f;
 }
 
 - (void)showImage:(UIImage*)image status:(NSString*)status duration:(NSTimeInterval)duration {
+    __sync_add_and_fetch(&_showGeneration, 1);
     __weak SVProgressHUD *weakSelf = self;
     [[NSOperationQueue mainQueue] addOperationWithBlock:^{
         __strong SVProgressHUD *strongSelf = weakSelf;
@@ -1020,11 +1023,14 @@ static const CGFloat SVProgressHUDLabelSpacing = 8.0f;
 }
 
 - (void)dismissWithDelay:(NSTimeInterval)delay completion:(SVProgressHUDDismissCompletion)completion {
+    NSUInteger generation = _showGeneration;
     __weak SVProgressHUD *weakSelf = self;
     [[NSOperationQueue mainQueue] addOperationWithBlock:^{
         __strong SVProgressHUD *strongSelf = weakSelf;
         if(strongSelf){
-            
+            if (strongSelf->_showGeneration != generation) {
+                return;
+            }
             // Post notification to inform user
             [[NSNotificationCenter defaultCenter] postNotificationName:SVProgressHUDWillDisappearNotification
                                                                 object:nil
